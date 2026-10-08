@@ -4,11 +4,26 @@ services:
     environment:
       POSTGRES_USER: bank
       POSTGRES_PASSWORD: secret
-      POSTGRES_DB: bank
+      POSTGRES_DB: banking
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql
 
-volumes:
-  pgdata:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank -d banking"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build: .
+    command: /app/migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build: .
+    command: /app/server
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
