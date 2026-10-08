@@ -2,7 +2,7 @@ CREATE TABLE "accounts" (
   "id" UUID PRIMARY KEY DEFAULT (uuidv7()),
   "owner" text NOT NULL,
   "phone_number" text UNIQUE NOT NULL,
-  "password_hash" text NOT NULL,
+  "secrete_code_hash" text NOT NULL,
   "balance" numeric(19, 2) NOT NULL CHECK(balance >= 0),
   "currency" char(3) NOT NULL,
   "created_at" timestamptz DEFAULT (now())
