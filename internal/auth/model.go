@@ -1,0 +1,18 @@
+package auth
+
+import (
+	"time"
+)
+
+type StartAuthRequest struct {
+	PhoneNumber string `json:"phone_number"`
+}
+
+type AuthChallenge struct {
+	ID          string
+	PhoneNumber string
+	CodeHash    string
+	ExpiresAt   time.Time
+	Attempts    int
+	CreatedAt   time.Time
+}
