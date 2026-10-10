@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Env string `yaml:"env" env:"APP_ENV" env-default:"development"`
+	Env     string `yaml:"env" env:"APP_ENV" env-default:"development"`
+	HMACKey string `yaml:"HMAC_KEY" env:"HMAC_KEY"`
 
 	PG PGConfig
 }
