@@ -16,3 +16,8 @@ type AuthChallenge struct {
 	Attempts    int
 	CreatedAt   time.Time
 }
+
+type SafeAuthChallenge struct {
+	ID        string
+	ExpiresAt time.Time
+}

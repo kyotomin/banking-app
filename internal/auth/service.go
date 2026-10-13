@@ -12,8 +12,10 @@ import (
 
 type AuthService struct {
 	Challenge *ChallengeRepository
-	otpSecret string
 	Account   *AccountRepository
+
+	otpSecret string
+	sender    OTPSender
 }
 
 const (
@@ -24,7 +26,7 @@ const (
 func (s *AuthService) StartAuth(
 	ctx context.Context,
 	rawPhone string,
-) (*AuthChallenge, error) {
+) (*SafeAuthChallenge, error) {
 
 	phone, err := validatePhoneNumber(rawPhone)
 	if err != nil {
@@ -49,9 +51,22 @@ func (s *AuthService) StartAuth(
 		return nil, err
 	}
 
-	//TODO: Add OTP send
+	if err := s.sender.SendCode(ctx, phone, code); err != nil {
+		if delErr := s.Challenge.Delete(ctx, id); delErr != nil {
+			return nil, fmt.Errorf(
+				"send OTP: %w; cleanup challenge: %v",
+				err,
+				delErr,
+			)
+		}
 
-	return challenge, nil
+		return nil, fmt.Errorf("send OTP: %w", err)
+	}
+
+	return &SafeAuthChallenge{
+		ID:        challenge.ID,
+		ExpiresAt: challenge.ExpiresAt,
+	}, nil
 }
 
 func (s *AuthService) VerifyCode(
