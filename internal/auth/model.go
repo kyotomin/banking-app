@@ -21,3 +21,8 @@ type SafeAuthChallenge struct {
 	ID        string
 	ExpiresAt time.Time
 }
+
+type VerifyCodeRequest struct {
+	ChallengeID string `json:"challenge_id" binding:"required"`
+	Code        string `json:"code" binding:"required"`
+}

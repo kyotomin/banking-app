@@ -11,11 +11,18 @@ import (
 )
 
 type AuthService struct {
-	Challenge *ChallengeRepository
-	Account   *AccountRepository
+	Repository *AuthRepository
 
 	otpSecret string
 	sender    OTPSender
+}
+
+func NewAuthService(repo *AuthRepository, secret string, sender OTPSender) *AuthService {
+	return &AuthService{
+		Repository: repo,
+		otpSecret:  secret,
+		sender:     sender,
+	}
 }
 
 const (
@@ -47,12 +54,12 @@ func (s *AuthService) StartAuth(
 		CreatedAt:   now,
 	}
 
-	if err := s.Challenge.Create(ctx, challenge); err != nil {
+	if err := s.Repository.Create(ctx, challenge); err != nil {
 		return nil, err
 	}
 
 	if err := s.sender.SendCode(ctx, phone, code); err != nil {
-		if delErr := s.Challenge.Delete(ctx, id); delErr != nil {
+		if delErr := s.Repository.Delete(ctx, id); delErr != nil {
 			return nil, fmt.Errorf(
 				"send OTP: %w; cleanup challenge: %v",
 				err,
@@ -74,13 +81,13 @@ func (s *AuthService) VerifyCode(
 	challengeID string,
 	code string,
 ) error {
-	challenge, err := s.Challenge.Get(ctx, challengeID)
+	challenge, err := s.Repository.Get(ctx, challengeID)
 	if err != nil {
 		return err
 	}
 
 	if challenge.Attempts >= maxOTPAttempts {
-		if err := s.Challenge.Delete(ctx, challengeID); err != nil {
+		if err := s.Repository.Delete(ctx, challengeID); err != nil {
 			return fmt.Errorf("delete exhausted challenge: %w", err)
 		}
 		return ErrTooManyAttempts
@@ -96,20 +103,20 @@ func (s *AuthService) VerifyCode(
 		challenge.Attempts++
 
 		if challenge.Attempts >= maxOTPAttempts {
-			if err := s.Challenge.Delete(ctx, challengeID); err != nil {
+			if err := s.Repository.Delete(ctx, challengeID); err != nil {
 				return fmt.Errorf("delete exhausted challenge: %w", err)
 			}
 			return ErrTooManyAttempts
 		}
 
-		if err := s.Challenge.Update(ctx, challenge); err != nil {
+		if err := s.Repository.Update(ctx, challenge); err != nil {
 			return fmt.Errorf("update challenge attempts: %w", err)
 		}
 
 		return ErrInvalidOTP
 	}
 
-	if err := s.Challenge.Delete(ctx, challengeID); err != nil {
+	if err := s.Repository.Delete(ctx, challengeID); err != nil {
 		return fmt.Errorf("consume challenge: %w", err)
 	}
 

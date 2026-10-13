@@ -11,21 +11,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type ChallengeRepository struct {
+type AuthRepository struct {
 	redis *redis.Client
+	db    *postgres.PostgresDatabase
 }
 
-type AccountRepository struct {
-	db *postgres.PostgresDatabase
-}
-
-func NewChallengeRepository(client *redis.Client) *ChallengeRepository {
-	return &ChallengeRepository{
+func NewAuthRepository(client *redis.Client, db *postgres.PostgresDatabase) *AuthRepository {
+	return &AuthRepository{
 		redis: client,
+		db:    db,
 	}
 }
 
-func (r *ChallengeRepository) Create(
+func (r *AuthRepository) Create(
 	ctx context.Context,
 	challenge *AuthChallenge,
 ) error {
@@ -49,7 +47,7 @@ func (r *ChallengeRepository) Create(
 	return nil
 }
 
-func (r *ChallengeRepository) Get(
+func (r *AuthRepository) Get(
 	ctx context.Context,
 	id string,
 ) (*AuthChallenge, error) {
@@ -72,7 +70,7 @@ func (r *ChallengeRepository) Get(
 	return &challenge, nil
 }
 
-func (r *ChallengeRepository) Update(
+func (r *AuthRepository) Update(
 	ctx context.Context,
 	challenge *AuthChallenge,
 ) error {
@@ -95,7 +93,7 @@ func (r *ChallengeRepository) Update(
 	return nil
 }
 
-func (r *ChallengeRepository) Delete(
+func (r *AuthRepository) Delete(
 	ctx context.Context,
 	id string,
 ) error {
