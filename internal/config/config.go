@@ -7,10 +7,13 @@ import (
 )
 
 type Config struct {
-	Env     string `yaml:"env" env:"APP_ENV" env-default:"development"`
-	HMACKey string `yaml:"HMAC_KEY" env:"HMAC_KEY"`
+	Env       string `yaml:"env" env:"APP_ENV" env-default:"development"`
+	HMACKey   string `yaml:"HMAC_KEY" env:"HMAC_KEY"`
+	OTPSecret string `yaml:"OTP_SECRET" env:"OTP_SECRET"`
+	TGToken   string `yaml:"TELEGRAM_TOKEN" env:"TELEGRAM_TOKEN"`
 
 	PG PGConfig
+	RE RedisConfig
 }
 
 type PGConfig struct {
@@ -23,7 +26,12 @@ type PGConfig struct {
 	MaxRetryAttempts int    `yaml:"retries" env:"MAX_RETRY_ATTEMPTS" env-default:"5"`
 }
 
-func Get() (*Config, error) {
+type RedisConfig struct {
+	Addr     string `yaml:"addr" env:"REDIS_HOST" env-required:"true"`
+	Password string `yaml:"password" env:"REDIS_PASSWORD" env-required:"true"`
+}
+
+func Load() (*Config, error) {
 	var cfg Config
 
 	if err := cleanenv.ReadConfig("config.yaml", &cfg); err != nil {
