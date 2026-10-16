@@ -2,6 +2,8 @@ package auth
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type StartAuthRequest struct {
@@ -25,4 +27,24 @@ type SafeAuthChallenge struct {
 type VerifyCodeRequest struct {
 	ChallengeID string `json:"challenge_id" binding:"required"`
 	Code        string `json:"code" binding:"required"`
+}
+
+type AccountExistResponse struct {
+	ID string
+}
+
+type VerificationResult struct {
+	Status string `json:"status"`
+	Token  string `json:"registration_token,omitempty"`
+}
+
+type AccountCreateRequest struct {
+	ID          uuid.UUID
+	Owner       string
+	PhoneNumber string
+	Balance     float64
+	PinHash     string
+	PinSalt     string
+	Currency    string
+	CreatedAt   time.Time
 }

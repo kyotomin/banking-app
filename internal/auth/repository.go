@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -23,7 +24,7 @@ func NewAuthRepository(client *redis.Client, db *postgres.PostgresDatabase) *Aut
 	}
 }
 
-func (r *AuthRepository) Create(
+func (r *AuthRepository) CreateChallenge(
 	ctx context.Context,
 	challenge *AuthChallenge,
 ) error {
@@ -47,7 +48,7 @@ func (r *AuthRepository) Create(
 	return nil
 }
 
-func (r *AuthRepository) Get(
+func (r *AuthRepository) GetChallenge(
 	ctx context.Context,
 	id string,
 ) (*AuthChallenge, error) {
@@ -70,7 +71,32 @@ func (r *AuthRepository) Get(
 	return &challenge, nil
 }
 
-func (r *AuthRepository) Update(
+func (r *AuthRepository) GetByPhone(
+	ctx context.Context,
+	phone string,
+) (string, error) {
+	var id string
+
+	err := r.db.Pool.QueryRow(
+		ctx,
+		`SELECT id
+		 FROM accounts
+		 WHERE phone_number = $1`,
+		phone,
+	).Scan(&id)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+
+		return "", fmt.Errorf("finding account by phone: %w", err)
+	}
+
+	return id, nil
+}
+
+func (r *AuthRepository) UpdateChallenge(
 	ctx context.Context,
 	challenge *AuthChallenge,
 ) error {
@@ -93,7 +119,7 @@ func (r *AuthRepository) Update(
 	return nil
 }
 
-func (r *AuthRepository) Delete(
+func (r *AuthRepository) DeleteChallenge(
 	ctx context.Context,
 	id string,
 ) error {
@@ -101,6 +127,82 @@ func (r *AuthRepository) Delete(
 
 	if err := r.redis.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("delete challeng: %w", err)
+	}
+
+	return nil
+}
+
+func (r *AuthRepository) CreateRegistration(
+	ctx context.Context,
+	token string,
+	phone string,
+) error {
+	key := "auth:registration:" + token
+
+	ttl := 5 * time.Minute
+
+	if err := r.redis.Set(ctx, key, phone, ttl).Err(); err != nil {
+		return fmt.Errorf("database error: %w", err)
+	}
+
+	return nil
+}
+
+func (r *AuthRepository) GetRegistration(
+	ctx context.Context,
+	token string,
+) (string, error) {
+	key := "auth:registration:" + token
+
+	phone, err := r.redis.Get(ctx, key).Bytes()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", errors.New("registration not found")
+		}
+
+		return "", fmt.Errorf("finding registration by token: %w", err)
+	}
+
+	return string(phone), nil
+}
+
+func (r *AuthRepository) DeleteRegistration(
+	ctx context.Context,
+	token string,
+) error {
+	key := "auth:registration:" + token
+	if err := r.redis.Del(ctx, key); err != nil {
+		return fmt.Errorf("registration not exist or already deleted: %w", err)
+	}
+
+	return nil
+}
+
+func (r *AuthRepository) CreateAccount(
+	ctx context.Context,
+	req AccountCreateRequest,
+) error {
+	query := `
+		INSERT INTO accounts
+		(id, owner, phone_number, secret_code_hash, secret_code_salt, currency, balance)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+
+	_, err := r.db.Pool.Exec(
+		ctx,
+		query,
+		req.ID,
+		req.Owner,
+		req.PhoneNumber,
+		req.PinHash,
+		req.PinSalt,
+		req.Currency,
+		req.Balance,
+		req.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("account creation request: %w", err)
 	}
 
 	return nil

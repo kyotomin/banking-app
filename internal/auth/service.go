@@ -30,6 +30,7 @@ const (
 	maxOTPAttempts = 5
 )
 
+// Generates code and challenge id
 func (s *AuthService) StartAuth(
 	ctx context.Context,
 	rawPhone string,
@@ -54,12 +55,12 @@ func (s *AuthService) StartAuth(
 		CreatedAt:   now,
 	}
 
-	if err := s.Repository.Create(ctx, challenge); err != nil {
+	if err := s.Repository.CreateChallenge(ctx, challenge); err != nil {
 		return nil, err
 	}
 
 	if err := s.sender.SendCode(ctx, phone, code); err != nil {
-		if delErr := s.Repository.Delete(ctx, id); delErr != nil {
+		if delErr := s.Repository.DeleteChallenge(ctx, id); delErr != nil {
 			return nil, fmt.Errorf(
 				"send OTP: %w; cleanup challenge: %v",
 				err,
@@ -81,13 +82,13 @@ func (s *AuthService) VerifyCode(
 	challengeID string,
 	code string,
 ) error {
-	challenge, err := s.Repository.Get(ctx, challengeID)
+	challenge, err := s.Repository.GetChallenge(ctx, challengeID)
 	if err != nil {
 		return err
 	}
 
 	if challenge.Attempts >= maxOTPAttempts {
-		if err := s.Repository.Delete(ctx, challengeID); err != nil {
+		if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
 			return fmt.Errorf("delete exhausted challenge: %w", err)
 		}
 		return ErrTooManyAttempts
@@ -103,22 +104,113 @@ func (s *AuthService) VerifyCode(
 		challenge.Attempts++
 
 		if challenge.Attempts >= maxOTPAttempts {
-			if err := s.Repository.Delete(ctx, challengeID); err != nil {
+			if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
 				return fmt.Errorf("delete exhausted challenge: %w", err)
 			}
 			return ErrTooManyAttempts
 		}
 
-		if err := s.Repository.Update(ctx, challenge); err != nil {
+		if err := s.Repository.UpdateChallenge(ctx, challenge); err != nil {
 			return fmt.Errorf("update challenge attempts: %w", err)
 		}
 
 		return ErrInvalidOTP
 	}
 
-	if err := s.Repository.Delete(ctx, challengeID); err != nil {
+	if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
 		return fmt.Errorf("consume challenge: %w", err)
 	}
 
 	return nil
+}
+
+func (s *AuthService) CompleteVerification(
+	ctx context.Context,
+	phone string,
+) (VerificationResult, error) {
+	id, err := s.Repository.GetByPhone(ctx, phone)
+	if err != nil {
+		return VerificationResult{
+			Status: "error",
+		}, err
+	}
+
+	if id == "" {
+		token, err := GenerateRegistrationToken()
+		if err != nil {
+			return VerificationResult{}, err
+		}
+
+		err = s.Repository.CreateRegistration(ctx, token, phone)
+		if err != nil {
+			return VerificationResult{}, err
+		}
+
+		return VerificationResult{
+			Status: "register",
+			Token:  token,
+		}, nil
+	}
+
+	return VerificationResult{
+		Status: "enter_pin",
+	}, nil
+}
+
+func (s *AuthService) Register(
+	ctx context.Context,
+	regToken string,
+	owner string,
+	pin string,
+	currency string,
+) (string, error) {
+	phone, err := s.Repository.GetRegistration(ctx, regToken)
+	if err != nil {
+		return "", err
+	}
+
+	if err := ValidateRegistrationInput(owner, pin, currency); err != nil {
+		return "", err
+	}
+
+	pinHash, salt, err := HashPIN(pin)
+	if err != nil {
+		return "", nil
+	}
+
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", fmt.Errorf("generate account ID: %w", err)
+	}
+
+	req := AccountCreateRequest{
+		ID:          id,
+		Owner:       owner,
+		PhoneNumber: phone,
+		PinHash:     hex.EncodeToString(pinHash),
+		PinSalt:     hex.EncodeToString(salt),
+		Currency:    currency,
+		Balance:     0,
+		CreatedAt:   time.Now(),
+	}
+
+	if err = s.Repository.CreateAccount(ctx, req); err != nil {
+		return "", err
+	}
+
+	if err := s.Repository.DeleteRegistration(ctx, regToken); err != nil {
+		return "", err
+	}
+
+	jwt, err := s.GenerateJWT(id.String())
+	if err != nil {
+		return "", fmt.Errorf("generate JWT: %w", err)
+	}
+
+	return jwt, nil
+}
+
+func (s *AuthService) GenerateJWT(id string) (string, error) {
+	// Todo
+	return "", nil
 }
