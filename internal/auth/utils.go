@@ -45,11 +45,11 @@ func HashOTP(secret, challengeID, code string) []byte {
 	return mac.Sum(nil)
 }
 
-func GenerateRegistrationToken() (string, error) {
+func GenerateToken() (string, error) {
 	b := make([]byte, 32)
 
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generate registration token: %w", err)
+		return "", fmt.Errorf("generate token: %w", err)
 	}
 
 	return hex.EncodeToString(b), nil

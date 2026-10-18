@@ -207,3 +207,30 @@ func (r *AuthRepository) CreateAccount(
 
 	return nil
 }
+
+func (r *AuthRepository) SaveToken(
+	ctx context.Context,
+	token RefreshTokenRecord,
+) error {
+	query := `
+		INSERT INTO refresh_tokens
+		(id, account_id, token_hash, expires_at, created_at)
+		 VALUES($1, $2, $3, $4, $5;
+	`
+
+	_, err := r.db.Pool.Exec(
+		ctx,
+		query,
+		token.ID,
+		token.AccountID,
+		token.TokenHash,
+		token.ExpiresAt,
+		token.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("save refresh token: %w", err)
+	}
+
+	return nil
+}

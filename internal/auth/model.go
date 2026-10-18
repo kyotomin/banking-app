@@ -48,3 +48,17 @@ type AccountCreateRequest struct {
 	Currency    string
 	CreatedAt   time.Time
 }
+
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+}
+
+type RefreshTokenRecord struct {
+	ID        uuid.UUID
+	AccountID uuid.UUID
+	TokenHash string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}

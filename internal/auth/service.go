@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -139,7 +140,7 @@ func (s *AuthService) CompleteVerification(
 	}
 
 	if id == "" {
-		token, err := GenerateRegistrationToken()
+		token, err := GenerateToken()
 		if err != nil {
 			return VerificationResult{}, err
 		}
@@ -216,11 +217,51 @@ func (s *AuthService) Register(
 func (s *AuthService) GenerateJWT(id string) (string, error) {
 	claims := jwt.MapClaims{
 		"uid": id,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
+		"exp": time.Now().Add(time.Minute * 15).Unix(),
 		"iat": time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString(s.jwtKey)
+}
+
+func (s *AuthService) IssueTokens(
+	ctx context.Context,
+	accountID string,
+) (*TokenPair, error) {
+	accessToken, err := s.GenerateJWT(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := GenerateToken()
+	if err != nil {
+		return nil, err
+	}
+
+	accID, err := uuid.Parse(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	uuid, _ := uuid.NewRandom()
+
+	record := RefreshTokenRecord{
+		ID:        uuid,
+		AccountID: accID,
+		TokenHash: fmt.Sprintf("%x", sha256.Sum256([]byte(refreshToken))),
+		ExpiresAt: time.Now().Add(720 * time.Hour),
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.Repository.SaveToken(ctx, record); err != nil {
+		return nil, fmt.Errorf("save refresh token: %w", err)
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	}, nil
 }
