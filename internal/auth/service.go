@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -14,13 +15,15 @@ type AuthService struct {
 	Repository *AuthRepository
 
 	otpSecret string
+	jwtKey    string
 	sender    OTPSender
 }
 
-func NewAuthService(repo *AuthRepository, secret string, sender OTPSender) *AuthService {
+func NewAuthService(repo *AuthRepository, secretOTP, jwtKey string, sender OTPSender) *AuthService {
 	return &AuthService{
 		Repository: repo,
-		otpSecret:  secret,
+		otpSecret:  secretOTP,
+		jwtKey:     jwtKey,
 		sender:     sender,
 	}
 }
@@ -211,6 +214,13 @@ func (s *AuthService) Register(
 }
 
 func (s *AuthService) GenerateJWT(id string) (string, error) {
-	// Todo
-	return "", nil
+	claims := jwt.MapClaims{
+		"uid": id,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
+		"iat": time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString(s.jwtKey)
 }

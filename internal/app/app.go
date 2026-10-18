@@ -36,8 +36,8 @@ func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Auth Register
 	authRepository := auth.NewAuthRepository(redisDB, postgresDB)
 
-	TelegramGatewaySender := telegram.NewGateway(cfg.TGToken)
-	authService := auth.NewAuthService(authRepository, cfg.OTPSecret, TelegramGatewaySender)
+	TelegramGatewaySender := telegram.NewGateway(cfg.Secret.TGToken)
+	authService := auth.NewAuthService(authRepository, cfg.Secret.OTPSecret, cfg.Secret.JWTKey, TelegramGatewaySender)
 
 	authHandler := auth.NewAuthHandler(authService)
 

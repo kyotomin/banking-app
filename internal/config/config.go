@@ -7,10 +7,8 @@ import (
 )
 
 type Config struct {
-	Env       string `yaml:"env" env:"APP_ENV" env-default:"development"`
-	HMACKey   string `yaml:"HMAC_KEY" env:"HMAC_KEY"`
-	OTPSecret string `yaml:"OTP_SECRET" env:"OTP_SECRET"`
-	TGToken   string `yaml:"TELEGRAM_TOKEN" env:"TELEGRAM_TOKEN"`
+	Env    string `yaml:"env" env:"APP_ENV" env-default:"development"`
+	Secret SecretConfig
 
 	PG PGConfig
 	RE RedisConfig
@@ -29,6 +27,13 @@ type PGConfig struct {
 type RedisConfig struct {
 	Addr     string `yaml:"addr" env:"REDIS_HOST" env-required:"true"`
 	Password string `yaml:"password" env:"REDIS_PASSWORD" env-required:"true"`
+}
+
+type SecretConfig struct {
+	HMACKey   string `yaml:"HMAC_KEY" env:"HMAC_KEY"`
+	OTPSecret string `yaml:"OTP_SECRET" env:"OTP_SECRET"`
+	TGToken   string `yaml:"TELEGRAM_TOKEN" env:"TELEGRAM_TOKEN"`
+	JWTKey    string `yaml:"JWT_SECRET_KEY" env:"JWT_SECRET_KEY"`
 }
 
 func Load() (*Config, error) {
