@@ -22,8 +22,8 @@ func (h *AuthHandler) RegisterRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
 
 	auth.POST("/start", h.HandleStartAuth)
-	auth.POST("/verify", h.VerifyCode)
 	auth.POST("/register", h.Register)
+	auth.POST("/confirm", h.HandleConfirmCode)
 }
 
 func (h *AuthHandler) HandleStartAuth(c *gin.Context) {
@@ -51,7 +51,7 @@ func (h *AuthHandler) HandleStartAuth(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) VerifyCode(c *gin.Context) {
+func (h *AuthHandler) HandleConfirmCode(c *gin.Context) {
 	var req VerifyCodeRequest
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -63,7 +63,7 @@ func (h *AuthHandler) VerifyCode(c *gin.Context) {
 	}
 
 	result, err := h.service.ConfirmCode(
-		ctx,
+		c.Request.Context(),
 		req.ChallengeID,
 		req.Code,
 	)
