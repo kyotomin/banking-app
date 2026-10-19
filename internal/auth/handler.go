@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -24,6 +23,7 @@ func (h *AuthHandler) RegisterRoutes(r *gin.Engine) {
 	auth.POST("/start", h.HandleStartAuth)
 	auth.POST("/register", h.Register)
 	auth.POST("/confirm", h.HandleConfirmCode)
+	auth.POST("/login", h.Login)
 }
 
 func (h *AuthHandler) HandleStartAuth(c *gin.Context) {
@@ -86,7 +86,7 @@ func (h *AuthHandler) HandleConfirmCode(c *gin.Context) {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterAccountRequest
 
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "bad registration request",
 		})
@@ -109,4 +109,38 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, tokens)
+}
+
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req LoginAccountRequest
+
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
+		return
+	}
+
+	tokens, err := h.service.Login(
+		c.Request.Context(),
+		req.PhoneNumber,
+		req.Pin,
+	)
+
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) ||
+			errors.Is(err, ErrAccountNotFound) {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid phone or PIN",
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "internal server error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, tokens)
 }

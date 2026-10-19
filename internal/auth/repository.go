@@ -48,29 +48,6 @@ func (r *AuthRepository) CreateChallenge(
 	return nil
 }
 
-func (r *AuthRepository) GetChallenge(
-	ctx context.Context,
-	id string,
-) (*AuthChallenge, error) {
-	key := "auth:challenge:" + id
-
-	data, err := r.redis.Get(ctx, key).Bytes()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, errors.New("challenge not found")
-		}
-
-		return nil, fmt.Errorf("get challenge: %w", err)
-	}
-
-	var challenge AuthChallenge
-	if err := json.Unmarshal(data, &challenge); err != nil {
-		return nil, fmt.Errorf("unmarshal challenge: %w", err)
-	}
-
-	return &challenge, nil
-}
-
 func (r *AuthRepository) GetByPhone(
 	ctx context.Context,
 	phone string,
@@ -94,6 +71,29 @@ func (r *AuthRepository) GetByPhone(
 	}
 
 	return id, nil
+}
+
+func (r *AuthRepository) GetChallenge(
+	ctx context.Context,
+	id string,
+) (*AuthChallenge, error) {
+	key := "auth:challenge:" + id
+
+	data, err := r.redis.Get(ctx, key).Bytes()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, ErrChallengeNotFound
+		}
+
+		return nil, fmt.Errorf("get challenge: %w", err)
+	}
+
+	var challenge AuthChallenge
+	if err := json.Unmarshal(data, &challenge); err != nil {
+		return nil, fmt.Errorf("unmarshal challenge: %w", err)
+	}
+
+	return &challenge, nil
 }
 
 func (r *AuthRepository) UpdateChallenge(
@@ -157,7 +157,7 @@ func (r *AuthRepository) GetRegistration(
 	phone, err := r.redis.Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return "", errors.New("registration not found")
+			return "", ErrRegistrationNotFound
 		}
 
 		return "", fmt.Errorf("finding registration by token: %w", err)
@@ -198,7 +198,6 @@ func (r *AuthRepository) CreateAccount(
 		req.PinSalt,
 		req.Currency,
 		req.Balance,
-		req.CreatedAt,
 	)
 
 	if err != nil {
@@ -215,7 +214,7 @@ func (r *AuthRepository) SaveToken(
 	query := `
 		INSERT INTO refresh_tokens
 		(id, account_id, token_hash, expires_at, created_at)
-		 VALUES($1, $2, $3, $4, $5;
+		 VALUES($1, $2, $3, $4, $5);
 	`
 
 	_, err := r.db.Pool.Exec(
@@ -233,4 +232,35 @@ func (r *AuthRepository) SaveToken(
 	}
 
 	return nil
+}
+
+func (r *AuthRepository) GetCredentials(
+	ctx context.Context,
+	phone string,
+) (*AccountCredentials, error) {
+	var creds AccountCredentials
+
+	err := r.db.Pool.QueryRow(
+		ctx,
+		`
+		SELECT (id, pin_hash, pin_salt)
+		FROM accounts
+		WHERE phone_number = $1
+	`,
+		phone,
+	).Scan(
+		&creds.ID,
+		&creds.PinHash,
+		&creds.PinSalt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrAccountNotFound
+		}
+
+		return nil, fmt.Errorf("get account credentials: %w", err)
+	}
+
+	return &creds, nil
 }

@@ -69,3 +69,14 @@ type RegisterAccountRequest struct {
 	Pin      string `json:"pin"`
 	Currency string `json:"currency"`
 }
+
+type LoginAccountRequest struct {
+	PhoneNumber string `json:"phone_number"`
+	Pin         string `json:"pin"`
+}
+
+type AccountCredentials struct {
+	ID      string
+	PinHash string
+	PinSalt string
+}

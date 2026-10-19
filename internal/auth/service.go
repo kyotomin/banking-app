@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
 )
 
 type AuthService struct {
@@ -277,4 +279,40 @@ func (s *AuthService) IssueTokens(
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
 	}, nil
+}
+
+func (s *AuthService) Login(
+	ctx context.Context,
+	phone string,
+	pin string,
+) (*TokenPair, error) {
+	creds, err := s.Repository.GetCredentials(ctx, phone)
+	if err != nil {
+		return nil, err
+	}
+
+	expectedHash, err := hex.DecodeString(creds.PinHash)
+	if err != nil {
+		return nil, fmt.Errorf("decode PIN hash: %w", err)
+	}
+
+	salt, err := hex.DecodeString(creds.PinSalt)
+	if err != nil {
+		return nil, fmt.Errorf("decode PIN salt: %w", err)
+	}
+
+	actualHash := argon2.IDKey(
+		[]byte(pin),
+		salt,
+		3,
+		64*1024,
+		4,
+		32,
+	)
+
+	if subtle.ConstantTimeCompare(actualHash, expectedHash) == 0 {
+		return nil, ErrInvalidCredentials
+	}
+
+	return s.IssueTokens(ctx, creds.ID)
 }
