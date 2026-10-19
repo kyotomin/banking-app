@@ -53,9 +53,9 @@ func (s *AuthService) StartAuth(
 	challenge := &AuthChallenge{
 		ID:          id,
 		PhoneNumber: phone,
-		CodeHash:    string(HashOTP(s.otpSecret, id, code)),
+		CodeHash:    hex.EncodeToString(HashOTP(s.otpSecret, id, code)),
 		ExpiresAt:   now.Add(otpTTL),
-		Attempts:    5,
+		Attempts:    0,
 		CreatedAt:   now,
 	}
 
@@ -85,23 +85,23 @@ func (s *AuthService) VerifyCode(
 	ctx context.Context,
 	challengeID string,
 	code string,
-) error {
+) (string, error) {
 	challenge, err := s.Repository.GetChallenge(ctx, challengeID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if challenge.Attempts >= maxOTPAttempts {
 		if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
-			return fmt.Errorf("delete exhausted challenge: %w", err)
+			return "", fmt.Errorf("delete exhausted challenge: %w", err)
 		}
-		return ErrTooManyAttempts
+		return "", ErrTooManyAttempts
 	}
 
 	expected := HashOTP(s.otpSecret, challengeID, code)
 	actual, err := hex.DecodeString(challenge.CodeHash)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if !hmac.Equal(expected, actual) {
@@ -109,32 +109,32 @@ func (s *AuthService) VerifyCode(
 
 		if challenge.Attempts >= maxOTPAttempts {
 			if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
-				return fmt.Errorf("delete exhausted challenge: %w", err)
+				return "", fmt.Errorf("delete exhausted challenge: %w", err)
 			}
-			return ErrTooManyAttempts
+			return "", ErrTooManyAttempts
 		}
 
 		if err := s.Repository.UpdateChallenge(ctx, challenge); err != nil {
-			return fmt.Errorf("update challenge attempts: %w", err)
+			return "", fmt.Errorf("update challenge attempts: %w", err)
 		}
 
-		return ErrInvalidOTP
+		return "", ErrInvalidOTP
 	}
 
 	if err := s.Repository.DeleteChallenge(ctx, challengeID); err != nil {
-		return fmt.Errorf("consume challenge: %w", err)
+		return "", fmt.Errorf("consume challenge: %w", err)
 	}
 
-	return nil
+	return challenge.PhoneNumber, nil
 }
 
 func (s *AuthService) CompleteVerification(
 	ctx context.Context,
 	phone string,
-) (VerificationResult, error) {
+) (*VerificationResult, error) {
 	id, err := s.Repository.GetByPhone(ctx, phone)
 	if err != nil {
-		return VerificationResult{
+		return &VerificationResult{
 			Status: "error",
 		}, err
 	}
@@ -142,23 +142,36 @@ func (s *AuthService) CompleteVerification(
 	if id == "" {
 		token, err := GenerateToken()
 		if err != nil {
-			return VerificationResult{}, err
+			return &VerificationResult{}, err
 		}
 
 		err = s.Repository.CreateRegistration(ctx, token, phone)
 		if err != nil {
-			return VerificationResult{}, err
+			return &VerificationResult{}, err
 		}
 
-		return VerificationResult{
+		return &VerificationResult{
 			Status: "register",
 			Token:  token,
 		}, nil
 	}
 
-	return VerificationResult{
+	return &VerificationResult{
 		Status: "enter_pin",
 	}, nil
+}
+
+func (s *AuthService) ConfirmCode(
+	ctx context.Context,
+	challengeID string,
+	code string,
+) (*VerificationResult, error) {
+	phone, err := s.VerifyCode(ctx, challengeID, code)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.CompleteVerification(ctx, phone)
 }
 
 func (s *AuthService) Register(
@@ -167,24 +180,24 @@ func (s *AuthService) Register(
 	owner string,
 	pin string,
 	currency string,
-) (string, error) {
+) (*TokenPair, error) {
 	phone, err := s.Repository.GetRegistration(ctx, regToken)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := ValidateRegistrationInput(owner, pin, currency); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	pinHash, salt, err := HashPIN(pin)
 	if err != nil {
-		return "", nil
+		return nil, fmt.Errorf("hash PIN: %w", err)
 	}
 
 	id, err := uuid.NewRandom()
 	if err != nil {
-		return "", fmt.Errorf("generate account ID: %w", err)
+		return nil, fmt.Errorf("generate account ID: %w", err)
 	}
 
 	req := AccountCreateRequest{
@@ -199,19 +212,19 @@ func (s *AuthService) Register(
 	}
 
 	if err = s.Repository.CreateAccount(ctx, req); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := s.Repository.DeleteRegistration(ctx, regToken); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	jwt, err := s.GenerateJWT(id.String())
+	tokens, err := s.IssueTokens(ctx, id.String())
 	if err != nil {
-		return "", fmt.Errorf("generate JWT: %w", err)
+		return nil, err
 	}
 
-	return jwt, nil
+	return tokens, nil
 }
 
 func (s *AuthService) GenerateJWT(id string) (string, error) {

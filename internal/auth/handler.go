@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -60,25 +62,51 @@ func (h *AuthHandler) VerifyCode(c *gin.Context) {
 		return
 	}
 
-	err := h.service.VerifyCode(
-		c.Request.Context(),
+	result, err := h.service.ConfirmCode(
+		ctx,
 		req.ChallengeID,
 		req.Code,
 	)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "verification failed",
-		})
-
+		switch {
+		case errors.Is(err, ErrInvalidOTP):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid code"})
+		case errors.Is(err, ErrTooManyAttempts):
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "phone verified",
-	})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
+	var req RegisterAccountRequest
 
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "bad registration request",
+		})
+		return
+	}
+
+	tokens, err := h.service.Register(
+		c.Request.Context(),
+		req.Token,
+		req.Owner,
+		req.Pin,
+		req.Currency,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "register failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, tokens)
 }

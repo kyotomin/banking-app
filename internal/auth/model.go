@@ -62,3 +62,10 @@ type RefreshTokenRecord struct {
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
+
+type RegisterAccountRequest struct {
+	Token    string `json:"token"`
+	Owner    string `json:"owner"`
+	Pin      string `json:"pin"`
+	Currency string `json:"currency"`
+}
