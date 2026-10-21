@@ -7,12 +7,12 @@ import (
 )
 
 type DashboardService struct {
-	Repository *DashboardRepository
+	repository *DashboardRepository
 }
 
 func NewDashboardService(repo *DashboardRepository) *DashboardService {
 	return &DashboardService{
-		Repository: repo,
+		repository: repo,
 	}
 }
 
@@ -29,13 +29,13 @@ func (s *DashboardService) GetDashboard(
 
 	g.Go(func() error {
 		var err error
-		account, err = s.Repository.GetAccount(ctx, accountID)
+		account, err = s.repository.GetAccount(ctx, accountID)
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
-		totalSpent, err = s.Repository.GetTotal(ctx, accountID)
+		totalSpent, err = s.repository.GetTotal(ctx, accountID)
 		return err
 	})
 

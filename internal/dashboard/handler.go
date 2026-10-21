@@ -7,11 +7,13 @@ import (
 )
 
 type DashboardHandler struct {
+	service *DashboardService
 }
 
-func NewDashboardHandler() *DashboardHandler {
-	return &DashboardHandler{}
-
+func NewDashboardHandler(svc *DashboardService) *DashboardHandler {
+	return &DashboardHandler{
+		service: svc,
+	}
 }
 
 func (h *DashboardHandler) RegisterRoutes(r *gin.Engine) {
@@ -35,9 +37,20 @@ func (h *DashboardHandler) HandleGetDashboard(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "invalid account id",
 		})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"account_id": accountID,
-	})
+	dashboard, err := h.service.GetDashboard(
+		c.Request.Context(),
+		accountID,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, dashboard)
 }
