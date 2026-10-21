@@ -1,0 +1,4 @@
+DROP TYPE IF EXISTS entry_type;
+
+ALTER TABLE entries
+DROP COLUMN type;
