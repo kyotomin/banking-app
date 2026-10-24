@@ -171,7 +171,7 @@ func (r *AuthRepository) DeleteRegistration(
 	token string,
 ) error {
 	key := "auth:registration:" + token
-	if err := r.redis.Del(ctx, key); err != nil {
+	if err := r.redis.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("registration not exist or already deleted: %w", err)
 	}
 
