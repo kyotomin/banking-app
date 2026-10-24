@@ -62,7 +62,7 @@ func (r *TransfersRepository) CreateTransfer(
 	toInfo, toErr := r.GetAccountInfo(ctx, tx, toAccountID)
 
 	if fromErr != nil || toErr != nil {
-		return "", fmt.Errorf("account not found")
+		return "", ErrAccountNotFound
 	}
 
 	if fromInfo.Currency != toInfo.Currency {
@@ -71,12 +71,12 @@ func (r *TransfersRepository) CreateTransfer(
 
 	balance, err := decimal.NewFromString(fromInfo.Balance)
 	if err != nil {
-		return "", fmt.Errorf("parse balance: %w", err)
+		return "", ErrParseFailed
 	}
 
 	amountDecimal, err = decimal.NewFromString(amount)
 	if err != nil {
-		return "", fmt.Errorf("parse amount: %w", err)
+		return "", ErrParseFailed
 	}
 
 	if balance.LessThan(amountDecimal) {
@@ -185,10 +185,33 @@ func (r *TransfersRepository) GetAccountInfo(
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return AccountInfo{}, fmt.Errorf("account not found")
+			return AccountInfo{}, ErrAccountNotFound
 		}
 		return AccountInfo{}, fmt.Errorf("get account info: %w", err)
 	}
 
 	return account, nil
+}
+
+func (r *TransfersRepository) GetByIdempotencyKey(
+	ctx context.Context,
+	idempotencyKey string,
+) (*Transfer, error) {
+	var info Transfer
+
+	err := r.db.Pool.QueryRow(ctx, `
+		SELECT (id, from_account_id, to_account_id, amount)
+		FROM transfers
+		WHERE idempotency_key = $1
+	`, idempotencyKey).Scan(&info)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("get transfer by idempotency key: %w", err)
+	}
+
+	return &info, nil
 }
