@@ -8,4 +8,6 @@ var (
 	ErrParseFailed         = errors.New("can't parse current value")
 	ErrAccountNotFound     = errors.New("account not found")
 	ErrIdempotencyConflict = errors.New("idempotency key conflict occured")
+	ErrInsufficientFunds   = errors.New("insufficient funds")
+	ErrCurrencyMismatch    = errors.New("currency mismatch")
 )

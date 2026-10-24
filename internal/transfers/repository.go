@@ -66,7 +66,7 @@ func (r *TransfersRepository) CreateTransfer(
 	}
 
 	if fromInfo.Currency != toInfo.Currency {
-		return "", fmt.Errorf("currency mismatch")
+		return "", ErrCurrencyMismatch
 	}
 
 	balance, err := decimal.NewFromString(fromInfo.Balance)
@@ -80,7 +80,7 @@ func (r *TransfersRepository) CreateTransfer(
 	}
 
 	if balance.LessThan(amountDecimal) {
-		return "", fmt.Errorf("insufficient balance")
+		return "", ErrInsufficientFunds
 	}
 
 	var transferID string
