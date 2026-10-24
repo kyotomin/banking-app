@@ -50,3 +50,10 @@ func (s *DashboardService) GetDashboard(
 		TotalSpent: totalSpent.Amount,
 	}, nil
 }
+
+func (s *DashboardService) GetMonthlyStats(
+	ctx context.Context,
+	accountID string,
+) (*MonthlyStats, error) {
+	return s.repository.GetMonthlyStats(ctx, accountID)
+}

@@ -72,3 +72,61 @@ func (r *DashboardRepository) GetTotal(
 
 	return total, nil
 }
+
+func (r *DashboardRepository) GetMonthlyStats(
+	ctx context.Context,
+	accountID string,
+) (*MonthlyStats, error) {
+	var stats MonthlyStats
+
+	err := r.db.Pool.QueryRow(ctx, `
+		SELECT 
+			COALESCE(SUM(amount) FILTER(WHERE type = 'income'), 0),
+			COALESCE(SUM(amount) FILTER(WHERE type = 'withdrawal'), 0)
+		FROM entries
+		WHERE account_id = $1
+		AND created_at >= date_trunc('month', now())
+		AND created < date_trunc('month', now()) + interval '1 month'
+	`, accountID).Scan(
+		&stats.TotalIncome,
+		&stats.TotalSpent,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Pool.Query(ctx, `
+		SELECT id, transfer_id, amount, type, category, created_at
+		FROM entries
+		WHERE account_id = %1
+		AND created_at >= date_trunc('month', now())
+		AND created < date_trunc('month', now()) + interval '1 month'
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var entry Entry
+
+		if err := rows.Scan(
+			&entry.ID,
+			&entry.Amount,
+			&entry.Type,
+			&entry.Category,
+			&entry.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		stats.Entries = append(stats.Entries, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}

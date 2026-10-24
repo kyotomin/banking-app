@@ -1,5 +1,7 @@
 package dashboard
 
+import "time"
+
 type DashboardStats struct {
 	Owner      string `json:"owner"`
 	Balance    string `json:"balance"`
@@ -15,4 +17,19 @@ type Account struct {
 
 type TotalSpent struct {
 	Amount string
+}
+
+type Entry struct {
+	ID         string
+	TransferID string
+	Amount     string
+	Type       string
+	Category   string
+	CreatedAt  time.Time
+}
+
+type MonthlyStats struct {
+	TotalIncome string  `json:"total_income"`
+	TotalSpent  string  `json:"total_spent"`
+	Entries     []Entry `json:"entries"`
 }

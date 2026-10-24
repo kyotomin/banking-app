@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -53,4 +54,32 @@ func (h *DashboardHandler) HandleGetDashboard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dashboard)
+}
+
+func (h *DashboardHandler) HandleGetMonthlyStats(c *gin.Context) {
+	accountID, exists := c.Request.Context().Value("Authorization").(string)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "unauthorized",
+		})
+		return
+	}
+
+	stats, err := h.service.GetMonthlyStats(c.Request.Context(), accountID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrAccountNotFound):
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "account not found",
+			})
+
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "internal server error",
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
 }
