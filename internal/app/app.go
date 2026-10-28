@@ -3,9 +3,11 @@ package app
 import (
 	"banking-app/internal/auth"
 	"banking-app/internal/config"
+	"banking-app/internal/dashboard"
 	"banking-app/internal/postgres"
 	"banking-app/internal/redis"
 	"banking-app/internal/telegram"
+	"banking-app/internal/transfers"
 	"context"
 	"errors"
 	"net/http"
@@ -41,10 +43,20 @@ func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	authHandler := auth.NewAuthHandler(authService)
 
+	transfersRepository := transfers.NewTransfersRepository(postgresDB)
+	transfersService := transfers.NewTransfersService(transfersRepository)
+	transfersHandler := transfers.NewTransfersHandler(transfersService)
+
+	dashboardRepository := dashboard.NewDashboardRepository(postgresDB, redisDB)
+	dashboardService := dashboard.NewDashboardService(dashboardRepository)
+	dashboardHandler := dashboard.NewDashboardHandler(dashboardService)
+
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
 	authHandler.RegisterRoutes(router)
+	transfersHandler.RegisterRoutes(router)
+	dashboardHandler.RegisterRoutes(router)
 
 	return &App{
 		router: router,
