@@ -17,6 +17,12 @@ func NewTransfersHandler(svc *TransfersService) *TransfersHandler {
 	}
 }
 
+func (h *TransfersHandler) RegisterRoutes(r *gin.Engine) {
+	transfer := r.Group("/transfers")
+
+	transfer.POST("create", h.HandleCreateTransfer)
+}
+
 func (h *TransfersHandler) HandleCreateTransfer(c *gin.Context) {
 	var req TransferInfo
 	if err := c.ShouldBindJSON(req); err != nil {

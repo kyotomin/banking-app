@@ -81,7 +81,7 @@ func (r *DashboardRepository) GetMonthlyStats(
 
 	err := r.db.Pool.QueryRow(ctx, `
 		SELECT 
-			COALESCE(SUM(amount) FILTER(WHERE type = 'income'), 0),
+			COALESCE(SUM(amount) FILTER(WHERE type = 'deposit'), 0),
 			COALESCE(SUM(amount) FILTER(WHERE type = 'withdrawal'), 0)
 		FROM entries
 		WHERE account_id = $1
@@ -100,7 +100,7 @@ func (r *DashboardRepository) GetMonthlyStats(
 		FROM entries
 		WHERE account_id = %1
 		AND created_at >= date_trunc('month', now())
-		AND created < date_trunc('month', now()) + interval '1 month'
+		AND created_at < date_trunc('month', now()) + interval '1 month'
 		ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -122,6 +122,48 @@ func (r *DashboardRepository) GetMonthlyStats(
 		}
 
 		stats.Entries = append(stats.Entries, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+func (r *DashboardRepository) GetCategoryStats(
+	ctx context.Context,
+	accountID string,
+) (*CategoryStats, error) {
+	var stats CategoryStats
+
+	rows, err := r.db.Pool.Query(ctx, `
+		SELECT 
+			category,
+			COALESCE(SUM(ABS(amount)) AS total_spent
+		FROM entries
+		WHERE account_id = $1
+			AND type = 'payment'
+			AND created_at >= date_trunc('month', now())
+			AND created_at < date_trunc('month', now()) + interval '1 month'
+		GROUP BY category
+		ORDER BY total_spent DESC
+	`, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var category Category
+
+		if err := rows.Scan(
+			&category.Title,
+			&category.TotalSpent,
+		); err != nil {
+			return nil, err
+		}
+
+		stats.Categories = append(stats.Categories, category)
 	}
 
 	if err := rows.Err(); err != nil {

@@ -21,6 +21,7 @@ func (h *DashboardHandler) RegisterRoutes(r *gin.Engine) {
 	dashboard := r.Group("/dashboard")
 
 	dashboard.GET("", h.HandleGetDashboard)
+	dashboard.GET("monthly", h.HandleGetMonthlyStats)
 }
 
 func (h *DashboardHandler) HandleGetDashboard(c *gin.Context) {

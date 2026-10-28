@@ -33,3 +33,12 @@ type MonthlyStats struct {
 	TotalSpent  string  `json:"total_spent"`
 	Entries     []Entry `json:"entries"`
 }
+
+type Category struct {
+	Title      string `json:"category_title"`
+	TotalSpent string `json:"total_spent"`
+}
+
+type CategoryStats struct {
+	Categories []Category `json:"categories"`
+}
